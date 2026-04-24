@@ -41,13 +41,18 @@ export class APIClient {
     }
   }
 
-  async login(username: string, password: string): Promise<ApiResponse<{ token: string }>> {
-    const r = await this.request<{ token: string }>('/api/v1/auth/token', { method: 'POST', body: JSON.stringify({ username, password }) })
-    if (r.data?.token) {
-      this.token = r.data.token
-      localStorage.setItem('finna-auth-token', r.data.token)
+  async login(username: string, password: string): Promise<ApiResponse<{ token: string; access_token?: string }>> {
+    // Prefer /auth/login (CLI-compatible) but fall back to /auth/token
+    let r = await this.request<{ token?: string; access_token?: string; token_type?: string }>('/api/v1/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
+    if (r.error) {
+      r = await this.request<{ token?: string; access_token?: string; token_type?: string }>('/api/v1/auth/token', { method: 'POST', body: JSON.stringify({ username, password }) })
     }
-    return r
+    const token = r.data?.access_token || r.data?.token
+    if (token) {
+      this.token = token
+      localStorage.setItem('finna-auth-token', token)
+    }
+    return { data: { token: token || '' }, status: r.status, error: r.error }
   }
 
   async getConnections(): Promise<ApiResponse<any[]>> { return this.request('/api/v1/config') }
