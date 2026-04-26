@@ -55,7 +55,11 @@ export class APIClient {
     return { data: { token: token || '' }, status: r.status, error: r.error }
   }
 
+  // --- Configuration ---
   async getConnections(): Promise<ApiResponse<any[]>> { return this.request('/api/v1/config') }
+  async getProjects(): Promise<ApiResponse<any[]>> { return this.request('/api/v1/config/projects') }
+
+  // --- Costs ---
   async getCosts(params?: { provider?: string, project?: string, startDate?: string, endDate?: string }): Promise<ApiResponse<any>> {
     const qs = new URLSearchParams(params as Record<string, string>).toString()
     return this.request(`/api/v1/costs${qs ? '?' + qs : ''}`)
@@ -64,16 +68,38 @@ export class APIClient {
     const qs = new URLSearchParams(params as Record<string, string>).toString()
     return this.request(`/api/v1/costs/totals${qs ? '?' + qs : ''}`)
   }
+  async getDailyCosts(params?: { startDate?: string, endDate?: string, provider?: string }): Promise<ApiResponse<any>> {
+    const qs = new URLSearchParams(params as Record<string, string>).toString()
+    return this.request(`/api/v1/costs/daily${qs ? '?' + qs : ''}`)
+  }
+  async getCostsBySku(params?: { provider?: string, limit?: number }): Promise<ApiResponse<any>> {
+    const qs = new URLSearchParams(params as Record<string, string>).toString()
+    return this.request(`/api/v1/costs/by-sku${qs ? '?' + qs : ''}`)
+  }
+
+  // --- Alerts ---
   async getAlerts(params?: { status?: string, severity?: string, limit?: number }): Promise<ApiResponse<any>> {
     const qs = new URLSearchParams(params as any).toString()
     return this.request(`/api/v1/alerts${qs ? '?' + qs : ''}`)
   }
-  async getRuns(limit = 50): Promise<ApiResponse<any[]>> { return this.request(`/api/v1/extractors/status?limit=${limit}`) }
+  async getAlertStats(): Promise<ApiResponse<any>> { return this.request('/api/v1/alerts/stats') }
+  async getActiveAlerts(): Promise<ApiResponse<any>> { return this.request('/api/v1/alerts/active') }
+  async acknowledgeAlert(id: string): Promise<ApiResponse<any>> {
+    return this.request(`/api/v1/alerts/${id}/acknowledge`, { method: 'POST', body: JSON.stringify({}) })
+  }
+
+  // --- Extractors ---
+  async getExtractorStatus(limit: number = 50): Promise<ApiResponse<any>> { return this.request(`/api/v1/extractors/status?limit=${limit}`) }
+  async getExtractors(params?: { provider?: string, limit?: number }): Promise<ApiResponse<any>> {
+    const qs = new URLSearchParams(params as Record<string, string>).toString()
+    return this.request(`/api/v1/extractors${qs ? '?' + qs : ''}`)
+  }
   async runExtractor(type: string, provider: string, configId?: string): Promise<ApiResponse<any>> {
     return this.request('/api/v1/extractors/run', { method: 'POST', body: JSON.stringify({ extractor_type: type, provider, config_id: configId }) })
   }
-  async getProjects(): Promise<ApiResponse<any[]>> { return this.request('/api/v1/config/projects') }
-  async healthCheck(): Promise<ApiResponse<any>> { return this.request('/api/v1/health') }
+
+  // --- Health ---
+  async healthCheck(): Promise<ApiResponse<any>> { return this.request('/healthz') }
 }
 
 let client: APIClient | null = null
