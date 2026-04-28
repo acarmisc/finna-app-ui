@@ -1,78 +1,134 @@
-import React from 'react'
-import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, FileText, TrendingUp, AlertTriangle, Settings, LogOut, Menu } from 'lucide-react'
+import React, { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { Icon } from '@/components/shared'
 import { cn } from '@/lib/utils'
 
 export interface SidebarProps {
   collapsed?: boolean
+  onToggle?: () => void
+  activeBase?: string
   onLogout?: () => void
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed = false, onLogout }) => {
-  const location = useLocation()
+const NAV = [
+  { sec: 'Overview' },
+  { id: 'dashboard', label: 'Dashboard', icon: 'layout-dashboard', path: '/dashboard' },
+  { id: 'costs', label: 'Cost explorer', icon: 'chart-line', path: '/costs' },
+  { sec: 'Resources' },
+  { id: 'projects', label: 'Projects', icon: 'folders', path: '/projects' },
+  { id: 'configs', label: 'Cloud configs', icon: 'plug', path: '/configs' },
+  { id: 'extractors', label: 'Extractors', icon: 'database', path: '/extractors' },
+  { sec: 'Monitoring' },
+  { id: 'alerts', label: 'Alerts', icon: 'bell', path: '/alerts', countKey: 'alerts' },
+  { id: 'settings', label: 'Settings', icon: 'settings-2', path: '/settings' },
+]
 
-  const menuItems = [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/projects', label: 'Projects', icon: FileText },
-    { path: '/costs', label: 'Cost Explorer', icon: TrendingUp },
-    { path: '/alerts', label: 'Alerts', icon: AlertTriangle },
-    { path: '/configs', label: 'Configurations', icon: Settings },
-  ]
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, activeBase = '/dashboard', onLogout }) => {
+  const [menu, setMenu] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
+  const counts: Record<string, number> = { alerts: 3 }
+
+  const handleNavigate = (path: string) => {
+    navigate(path)
+  }
 
   return (
-    <aside
-      className={cn(
-        'bg-slate-900 border-r border-slate-800 flex flex-col transition-all duration-300',
-        collapsed ? 'w-16' : 'w-64'
-      )}
-    >
-      <div className="p-4 border-b border-slate-800 flex items-center gap-3 h-16">
-        <div className={cn('flex items-center gap-2', collapsed ? 'justify-center' : '')}>
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
-            <span className="text-white font-bold text-lg">F</span>
-          </div>
-          {!collapsed && <span className="text-white font-bold text-lg">FinOps Console</span>}
-        </div>
+    <aside className={cn('sb', collapsed && 'sb-collapsed')}>
+      <div className="sb-logo" onClick={onToggle} title={collapsed ? 'Expand' : 'Collapse'}>
+        <span className="caret">&gt;</span>
+        <span className="wordmark">finna</span>
+        <span className="cursor" />
       </div>
-
-      <nav className="flex-1 py-4">
-        <ul className="space-y-1 px-2">
-          {menuItems.map((item) => {
-            const isActive = location.pathname === item.path
-            return (
-              <li key={item.path}>
-                <Link
-                  to={item.path}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group',
-                    isActive
-                      ? 'bg-blue-600 text-white'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-800'
-                  )}
-                >
-                  <item.icon className="w-5 h-5 flex-shrink-0" />
-                  {!collapsed && <span className="font-medium">{item.label}</span>}
-                </Link>
-              </li>
-            )
-          })}
-        </ul>
+      <nav className="sb-nav">
+        {NAV.map((item, i) => {
+          if (item.sec) return <div key={i} className="sb-section">{item.sec}</div>
+          const active = activeBase === item.path
+          return (
+            <a
+              key={item.id}
+              className={cn('sb-item', active && 'active')}
+              onClick={(e) => {
+                e.preventDefault()
+                handleNavigate(item.path!)
+              }}
+              href={`#${item.path}`}
+            >
+              <Icon name={item.icon!} size={16} />
+              <span className="label">{item.label}</span>
+              {item.countKey && counts[item.countKey] > 0 && (
+                <span className="count">{counts[item.countKey]}</span>
+              )}
+            </a>
+          )
+        })}
       </nav>
-
-      {onLogout && (
-        <div className="p-4 border-t border-slate-800">
-          <button
-            onClick={onLogout}
-            className={cn(
-              'flex items-center gap-3 px-3 py-2 w-full rounded-lg transition-colors',
-              'text-slate-400 hover:text-red-400 hover:bg-slate-800/50'
-            )}
-          >
-            <LogOut className="w-5 h-5" />
-            {!collapsed && <span className="font-medium">Logout</span>}
-          </button>
+      <div className="sb-foot" style={{ position: 'relative' }}>
+        <div className="avatar">FN</div>
+        <div className="who">
+          <div className="name">finops@acme.co</div>
+          <div className="org">API · healthy</div>
         </div>
-      )}
+        <span className="health" title="API healthy" />
+        <button className="icon-btn" onClick={() => setMenu((m) => !m)} title="Account">
+          <Icon name="chevron-up" size={14} />
+        </button>
+        {menu && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 'calc(100% + 4px)',
+              right: 8,
+              left: 8,
+              background: 'var(--surface)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 4px 0 rgba(0,0,0,0.3)',
+              zIndex: 20,
+            }}
+          >
+            <a
+              href="#/settings"
+              onClick={(e) => {
+                e.preventDefault()
+                setMenu(false)
+                navigate('/settings')
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                fontSize: 12,
+                color: 'var(--fg)',
+                borderBottom: '1px solid var(--border-2)',
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name="settings-2" size={14} />
+              <span>Settings</span>
+            </a>
+            <a
+              onClick={() => {
+                setMenu(false)
+                onLogout?.()
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 12px',
+                fontSize: 12,
+                color: 'var(--danger)',
+                cursor: 'pointer',
+                fontFamily: 'JetBrains Mono, monospace',
+              }}
+            >
+              <Icon name="log-out" size={14} />
+              <span>Log out</span>
+            </a>
+          </div>
+        )}
+      </div>
     </aside>
   )
 }

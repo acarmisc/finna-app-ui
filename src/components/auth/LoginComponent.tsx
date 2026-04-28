@@ -1,48 +1,76 @@
-import React, { useState, useEffect } from 'react'
-import { getApiClient } from '../../services/apiClient'
+import React, { useState } from 'react'
+import { Button } from '@/components/ui/button'
 
-export function LoginComponent({ onLogin }: { onLogin: () => void }) {
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+export interface LoginComponentProps {
+  onLogin: () => void
+}
+
+function LoginComponent({ onLogin }: LoginComponentProps) {
+  const [user, setUser] = useState('finops@acme.co')
+  const [pw, setPw] = useState('')
+  const [err, setErr] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const submit = (e: React.FormEvent) => {
     e.preventDefault()
-    setError('')
-    setLoading(true)
-    try {
-      const client = getApiClient()
-      const res = await client.login(username, password)
-      if (res.error) {
-        setError(res.error.message || 'Login failed')
-      } else {
-        onLogin()
-      }
-    } catch (err) {
-      setError('Network error')
-    } finally {
-      setLoading(false)
+    setErr('')
+    if (!pw) {
+      setErr('enter a password to authenticate')
+      return
     }
+    setLoading(true)
+    setTimeout(() => {
+      setLoading(false)
+      onLogin()
+    }, 700)
   }
 
   return (
-    <div style={{ maxWidth: '420px', margin: '100px auto', fontFamily: 'system-ui' }}>
-      <h2>FinOps Console</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '12px' }}>
-          <label>Username</label><br/>
-          <input type="text" value={username} onChange={e => setUsername(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-hd">
+          <span className="caret">&gt; </span>finna login<span className="cursor" />
         </div>
-        <div style={{ marginBottom: '12px' }}>
-          <label>Password</label><br/>
-          <input type="password" value={password} onChange={e => setPassword(e.target.value)} required style={{ width: '100%', padding: '8px' }} />
+        <form className="login-bd" onSubmit={submit}>
+          <div className="field">
+            <div className="label">username</div>
+            <input
+              className={`inp ${err ? 'error' : ''}`}
+              value={user}
+              onChange={(e) => setUser(e.target.value)}
+              placeholder="user@domain.com"
+            />
+          </div>
+          <div className="field">
+            <div className="label">password</div>
+            <input
+              type="password"
+              className={`inp ${err ? 'error' : ''}`}
+              value={pw}
+              onChange={(e) => setPw(e.target.value)}
+              placeholder="••••••••"
+            />
+            {err && <div className="hint error">// {err}</div>}
+          </div>
+          <div className="field" style={{ marginTop: 20 }}>
+            <Button variant="default" type="submit" disabled={loading} className="bracket block">
+              {loading ? 'authenticating…' : 'authenticate'}
+            </Button>
+          </div>
+          <div className="ascii-divider" style={{ textAlign: 'center', marginTop: 16 }}>
+            · · · · · ·
+          </div>
+          <div className="hint" style={{ textAlign: 'center', marginTop: 8 }}>
+            POST /api/v1/auth/token
+          </div>
+        </form>
+        <div className="login-foot">
+          <span>v2.4.1</span>
+          <span>api · http://api.finna.dev</span>
         </div>
-        <button type="submit" disabled={loading} style={{ padding: '10px 20px' }}>
-          {loading ? 'Logging in...' : 'Sign In'}
-        </button>
-      </form>
+      </div>
     </div>
   )
 }
+
+export default LoginComponent

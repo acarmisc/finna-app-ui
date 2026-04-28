@@ -100,6 +100,30 @@ export class APIClient {
 
   // --- Health ---
   async healthCheck(): Promise<ApiResponse<any>> { return this.request('/healthz') }
+
+  // --- Projects ---
+  async getProject(slug: string): Promise<ApiResponse<any>> { return this.request(`/api/v1/config/projects/${slug}`) }
+
+  // --- Connections ---
+  async getConnection(id: string): Promise<ApiResponse<any>> { return this.request(`/api/v1/config/${id}`) }
+  async testConnection(id: string): Promise<ApiResponse<any>> { return this.request(`/api/v1/config/${id}/test`, { method: 'POST' }) }
+  async createConnection(data: any): Promise<ApiResponse<any>> { return this.request('/api/v1/config', { method: 'POST', body: JSON.stringify(data) }) }
+  async deleteConnection(id: string): Promise<ApiResponse<any>> { return this.request(`/api/v1/config/${id}`, { method: 'DELETE' }) }
+
+  // --- Extractors ---
+  async getExtractorRuns(params?: { configId?: string, limit?: number }): Promise<ApiResponse<any>> {
+    const qs = new URLSearchParams(params as Record<string, string>).toString()
+    return this.request(`/api/v1/extractors/runs${qs ? '?' + qs : ''}`)
+  }
+  async triggerExtractor(data: { config_id: string; extractor_type?: string }): Promise<ApiResponse<any>> {
+    return this.request('/api/v1/extractors/run', { method: 'POST', body: JSON.stringify(data) })
+  }
+
+  // --- Dashboard ---
+  async getDashboardStats(range?: string): Promise<ApiResponse<any>> {
+    const qs = range ? `?range=${range}` : ''
+    return this.request(`/api/v1/dashboard/stats${qs}`)
+  }
 }
 
 let client: APIClient | null = null
