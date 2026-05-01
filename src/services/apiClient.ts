@@ -1,170 +1,178 @@
-import { useAuthStore } from '@/store/auth'
+// Comprehensive API Client Service
+import axios, { AxiosInstance, AxiosResponse, InternalAxiosRequestConfig, AxiosError } from 'axios'
+import { useAuthStore } from '../store/auth'
+import { API_BASE_URL } from '../api/client'
 
-// Full API Client for Hooks
-// Simplified version - uses Zustand auth store
-export class APIClient {
-  private token: string | null
-
+// Enhanced API Client with better error handling and typing
+export class FinnaApiClientClass {
+  private instance: AxiosInstance
+  
   constructor() {
-    const store = useAuthStore.getState()
-    this.token = store.token || null
-  }
-
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<{ data?: T; error?: any; status: number }> {
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...Object.fromEntries(new Headers(options.headers).entries()),
-    }
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`
-    }
-    
-    try {
-      const resp = await fetch(`http://localhost:8000/api/v1${endpoint}`, { 
-        ...options, 
-        headers, 
-        credentials: 'include' 
-      })
-      
-      if (!resp.ok) {
-        let parsed: any
-        try { parsed = await resp.json() } catch { parsed = {} }
-        return { 
-          status: resp.status, 
-          error: parsed.error || { message: 'API error' } 
-        }
-      }
-      
-      const data = await resp.json()
-      return { data, status: resp.status }
-    } catch (e: any) {
-      return { 
-        status: 0, 
-        error: 
-          { message: e.message || 'Network error' } 
-      }
-    }
-  }
-
-  // --- Authentication ---
-  async login(username: string, password: string): Promise<{ data?: { token: string }; error?: any; status: number }> {
-    const r1 = await this.request<{ token?: string; access_token?: string } | null>('/auth/login', { 
-      method: 'POST', 
-      body: JSON.stringify({ username, password }) 
+    this.instance = axios.create({
+      baseURL: API_BASE_URL,
+      timeout: 30000,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     })
-    let r = r1
-    if (r1.error || !r1.data) {
-      r = await this.request<{ token?: string; access_token?: string } | null>('/auth/token', { 
-        method: 'POST', 
-        body: JSON.stringify({ username, password }) 
-      })
+    
+    this.setupInterceptors()
+  }
+  
+  private setupInterceptors() {
+    // Request interceptor
+    this.instance.interceptors.request.use(
+      (config: InternalAxiosRequestConfig) => {
+        const token = useAuthStore.getState().token
+        if (token && config.headers) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+        return config
+      },
+      (error: AxiosError) => {
+        return Promise.reject(this.handleError(error))
+      }
+    )
+    
+    // Response interceptor
+    this.instance.interceptors.response.use(
+      (response: AxiosResponse) => response,
+      (error: AxiosError) => {
+        if (error.response?.status === 401) {
+          useAuthStore.getState().logout()
+        }
+        return Promise.reject(this.handleError(error))
+      }
+    )
+  }
+  
+  private handleError(error: AxiosError): Error {
+    if (error.response) {
+      // Server responded with a status code outside 2xx
+      const status = error.response.status
+      const data = error.response.data
+      
+      if (typeof data === 'object' && data !== null && 'message' in data) {
+        return new Error(`API Error ${status}: ${data.message}`)
+      }
+      
+      return new Error(`API Error ${status}: ${JSON.stringify(data)}`)
+    } else if (error.request) {
+      // Request was made but no response received
+      return new Error('Network Error: No response from server')
+    } else {
+      // Something happened in setting up the request
+      return new Error(`Request Error: ${error.message}`)
     }
-    const token = r.data?.access_token || r.data?.token
-    if (token) {
-      this.token = token
-      useAuthStore.getState().setToken(token)
+  }
+  
+  // Auth methods
+  async login(username: string, password: string): Promise<{ token: string }> {
+    try {
+      const response = await this.instance.post('/api/v1/auth/token', { username, password })
+      return response.data
+    } catch (error) {
+      throw this.handleError(error as AxiosError)
     }
-    return { 
-      data: { token: (token as string) || '' }, 
-      error: r.error || undefined,
-      status: (r as any)?.status || 0
-    }
-  }
-
-  // --- Configuration ---
-  async getConnections(): Promise<{ data?: any[]; error?: any; status: number }> {
-    return this.request('/config')
   }
   
-  async getProjects(): Promise<{ data?: any[]; error?: any; status: number }> {
-    return this.request('/config/projects')
-  }
-
-  // --- Costs ---
-  async getCosts(params?: { provider?: string, project?: string, startDate?: string, endDate?: string }): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = new URLSearchParams(params as Record<string, string>).toString()
-    return this.request(`/costs${qs ? '?' + qs : ''}`)
-  }
-  
-  async getCostTotals(params?: { startDate?: string, endDate?: string }): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = new URLSearchParams(params as Record<string, string>).toString()
-    return this.request(`/costs/totals${qs ? '?' + qs : ''}`)
+  // Cost methods
+  async getCosts(params?: {
+    provider?: string
+    project?: string
+    startDate?: string
+    endDate?: string
+  }): Promise<any> {
+    return this.instance.get('/api/v1/costs', { params })
   }
   
-  async getDailyCosts(params?: { startDate?: string, endDate?: string, provider?: string }): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = new URLSearchParams(params as Record<string, string>).toString()
-    return this.request(`/costs/daily${qs ? '?' + qs : ''}`)
+  async getCostTotals(params?: { startDate?: string; endDate?: string }): Promise<any> {
+    return this.instance.get('/api/v1/costs/totals', { params })
   }
   
-  async getCostsBySku(params?: { provider?: string, limit?: number }): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = new URLSearchParams(params as Record<string, string>).toString()
-    return this.request(`/costs/by-sku${qs ? '?' + qs : ''}`)
-  }
-
-  // --- Alerts ---
-  async getAlerts(params?: { status?: string, severity?: string, limit?: number }): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = new URLSearchParams(params as Record<string, string>).toString()
-    return this.request(`/alerts${qs ? '?' + qs : ''}`)
+  async getDailyCosts(params?: {
+    startDate?: string
+    endDate?: string
+    provider?: string
+  }): Promise<any> {
+    return this.instance.get('/api/v1/costs/daily', { params })
   }
   
-  async getAlertStats(): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request('/alerts/stats')
+  async getCostsBySku(params?: { provider?: string; limit?: number }): Promise<any> {
+    return this.instance.get('/api/v1/costs/by-sku', { params })
   }
   
-  async acknowledgeAlert(id: string): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request(`/alerts/${id}/acknowledge`, { method: 'POST', body: JSON.stringify({}) })
-  }
-
-  // --- Projects ---
-  async getProject(slug: string): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request(`/config/projects/${slug}`)
-  }
-
-  // --- Connections ---
-  async getConnection(id: string): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request(`/config/${id}`)
+  // Alert methods
+  async getAlerts(params?: {
+    status?: string
+    severity?: string
+    limit?: number
+  }): Promise<any> {
+    return this.instance.get('/api/v1/alerts', { params })
   }
   
-  async testConnection(id: string): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request(`/config/${id}/test`, { method: 'POST' })
+  async getAlertStats(): Promise<any> {
+    return this.instance.get('/api/v1/alerts/stats')
   }
   
-  async createConnection(data: any): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request('/config', { method: 'POST', body: JSON.stringify(data) })
+  async acknowledgeAlert(id: string): Promise<any> {
+    return this.instance.post(`/api/v1/alerts/${id}/acknowledge`)
   }
   
-  async deleteConnection(id: string): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request(`/config/${id}`, { method: 'DELETE' })
-  }
-
-  // --- Extractors ---
-  async getExtractors(params?: { provider?: string, limit?: number }): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = new URLSearchParams(params as Record<string, string>).toString()
-    return this.request(`/extractors${qs ? '?' + qs : ''}`)
+  // Project methods
+  async getProjects(): Promise<any> {
+    return this.instance.get('/api/v1/projects')
   }
   
-  async getExtractorRuns(params?: { configId?: string, limit?: number }): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = new URLSearchParams(params as Record<string, string>).toString()
-    return this.request(`/extractors/runs${qs ? '?' + qs : ''}`)
+  async getProject(slug: string): Promise<any> {
+    return this.instance.get(`/api/v1/projects/${slug}`)
   }
   
-  async triggerExtractor(data: { config_id: string; extractor_type?: string }): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request('/extractors/run', { method: 'POST', body: JSON.stringify(data) })
-  }
-
-  // --- Dashboard ---
-  async getDashboardStats(range?: string): Promise<{ data?: any; error?: any; status: number }> {
-    const qs = range ? `?range=${range ?? ''}` : ''
-    return this.request(`/dashboard/stats${qs}`)
+  // Config methods
+  async getConnections(): Promise<any> {
+    return this.instance.get('/api/v1/config')
   }
   
-  async getTopProjects(range?: string, limit?: number): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request(`/projects/top?range=${range || 'mtd'}&limit=${limit || 5}`)
+  async getConnection(id: string): Promise<any> {
+    return this.instance.get(`/api/v1/config/${id}`)
   }
   
-  async getRecentRuns(limit: number = 10): Promise<{ data?: any; error?: any; status: number }> {
-    return this.request(`/extractors/runs?limit=${limit}`)
+  async testConnection(id: string): Promise<any> {
+    return this.instance.post(`/api/v1/config/${id}/test`)
+  }
+  
+  async createConnection(data: any): Promise<any> {
+    return this.instance.post('/api/v1/config', data)
+  }
+  
+  async deleteConnection(id: string): Promise<any> {
+    return this.instance.delete(`/api/v1/config/${id}`)
+  }
+  
+  // Extractor methods
+  async getExtractors(params?: { provider?: string; limit?: number }): Promise<any> {
+    return this.instance.get('/api/v1/extractors', { params })
+  }
+  
+  async getExtractorRuns(params?: { configId?: string; limit?: number }): Promise<any> {
+    return this.instance.get('/api/v1/extractors/runs', { params })
+  }
+  
+  async triggerExtractor(data: { config_id: string; extractor_type?: string }): Promise<any> {
+    return this.instance.post('/api/v1/extractors/trigger', data)
+  }
+  
+  // Dashboard methods
+  async getDashboardStats(range?: 'mtd' | '7d' | '30d' | '90d'): Promise<any> {
+    return this.instance.get('/api/v1/dashboard/stats', { params: { range } })
   }
 }
 
-export const getApiClient = () => new APIClient()
+// Singleton instance
+export const apiClient = new FinnaApiClientClass()
+
+export function getApiClient(): FinnaApiClientClass {
+  return apiClient
+}
+
+export type { FinnaApiClientClass as FinnaApiClient }

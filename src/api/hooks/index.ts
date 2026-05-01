@@ -1,7 +1,7 @@
 // API hooks for Finna Console
 // Uses React Query with the existing apiClient
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { getApiClient, type APIClient } from '@/services/apiClient'
+import { getApiClient } from '@/services/apiClient'
 import {
   CostListResponse,
   CostTotalsResponse,
@@ -168,7 +168,7 @@ export function useTestConnection() {
 export function useCreateConnection() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (data: Parameters<APIClient['createConnection']>[0]) =>
+    mutationFn: (data: any) =>
       getApiClient().createConnection(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['connections'] })

@@ -1,5 +1,5 @@
 // Re-export pages for cleaner imports
-export { default as DashboardPage } from './DashboardPage'
+export { DashboardPage } from './DashboardPage'
 export { default as ProjectsListPage } from './ProjectsListPage'
 export { default as ProjectDetailPage } from './ProjectDetailPage'
 export { default as CostsPage } from './CostsPage'
