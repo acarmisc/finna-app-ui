@@ -261,4 +261,13 @@ export interface HealthResponse {
   database: string
 }
 
+// --- UI Store Types ---
 
+export interface ViewState {
+  sidebarCollapsed: boolean
+  theme: 'dark' | 'light'
+  dateRange: {
+    start: Date | null
+    end: Date | null
+  }
+}
